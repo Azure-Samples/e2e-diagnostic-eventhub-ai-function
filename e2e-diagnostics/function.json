@@ -5,7 +5,7 @@
       "name": "myEventHubMessage",
       "direction": "in",
       "path": "insights-logs-e2ediagnostics",
-      "connection": "am-eventhub_RootManageSharedAccessKey_EVENTHUB",
+      "connection": "E2E_DIAGNOSTICS_EVENTHUB_ENDPOINT",
       "consumerGroup": "$Default"
     }
   ],
