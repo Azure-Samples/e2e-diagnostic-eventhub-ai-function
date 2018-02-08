@@ -26,7 +26,7 @@ class EventHubMessage {
 public static void Run(EventData myEventHubMessage, TraceWriter log)
 {
     TelemetryClient telemetry = new TelemetryClient();
-    telemetry.InstrumentationKey = "<INSTRUMENTATION_KEY_OF_APPLICATION_INSIGHT>";
+    telemetry.InstrumentationKey = System.Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process);
     string messageBody = System.Text.Encoding.UTF8.GetString(myEventHubMessage.GetBytes());
     EventHubMessage ehm = JsonConvert.DeserializeObject<EventHubMessage>(messageBody);
     
