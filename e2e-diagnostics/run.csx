@@ -3,6 +3,7 @@ using System;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Linq;
 using Microsoft.ServiceBus.Common;
 using Microsoft.ServiceBus.Messaging;
 using Microsoft.ApplicationInsights;
@@ -30,7 +31,16 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
     string messageBody = System.Text.Encoding.UTF8.GetString(myEventHubMessage.GetBytes());
     EventHubMessage ehm = JsonConvert.DeserializeObject<EventHubMessage>(messageBody);
     
+    string[] OPERATIONS = {
+        "DiagnosticIoTHubIngress",
+        "DiagnosticIoTHubRouting",
+        "deviceDisconnect",
+        "deviceConnect"
+    };
     foreach(Record record in ehm.records) {
+        if(!OPERATIONS.Contains(record.operationName)) {
+            continue;
+        }
         var properties = new Dictionary<string, string>()
         {
             {"time", record.time},
