@@ -31,6 +31,9 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
     EventHubMessage ehm = JsonConvert.DeserializeObject<EventHubMessage>(messageBody);
     
     foreach(Record record in ehm.records) {
+        if(string.IsNullOrEmpty(record.operationName)) {
+            continue;
+        }
         var properties = new Dictionary<string, string>()
         {
             {"time", record.time},
