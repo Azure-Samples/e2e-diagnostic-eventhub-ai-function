@@ -33,6 +33,8 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
     
     string[] OPERATIONS = {
         "DiagnosticIoTHubIngress",
+        "DiagnosticIoTHubD2C",
+        "DiagnosticIoTHubEgress",
         "DiagnosticIoTHubRouting",
         "deviceDisconnect",
         "deviceConnect"
