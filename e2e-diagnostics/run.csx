@@ -47,7 +47,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
             {"time", record.time},
             {"resourceId", record.resourceId},
             {"operationName", record.operationName},
-            {"durationMs", record.latency},
+            {"durationMs", record.durationMs},
             {"correlationId", record.correlationId},
             {"properties", record.properties}
         };
