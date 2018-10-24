@@ -35,7 +35,6 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
         "DiagnosticIoTHubIngress",
         "DiagnosticIoTHubD2C",
         "DiagnosticIoTHubEgress",
-        "DiagnosticIoTHubRouting",
         "deviceDisconnect",
         "deviceConnect"
     };
@@ -48,7 +47,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
             {"time", record.time},
             {"resourceId", record.resourceId},
             {"operationName", record.operationName},
-            {"durationMs", record.durationMs},
+            {"durationMs", record.latency},
             {"correlationId", record.correlationId},
             {"properties", record.properties}
         };
