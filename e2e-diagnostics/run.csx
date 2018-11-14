@@ -18,13 +18,14 @@ public class AI
         telemetry.InstrumentationKey = Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process);
     }
 
-    public void SendD2CLog(string deviceId, int d2cLatency, string id)
+    public void SendD2CLog(string deviceId, int d2cLatency, string id, bool hasError = false)
     {
         var dependencyTelemety = new DependencyTelemetry
         {
             Id = id,
             Target = DefaultIoTHubRoleName,
-            Duration = new TimeSpan(0, 0, 0, 0, d2cLatency)
+            Duration = new TimeSpan(0, 0, 0, 0, d2cLatency),
+            Success = !hasError
         };
         telemetry.Context.Cloud.RoleName = DefaultDeviceRoleName;
         telemetry.Context.Cloud.RoleInstance = deviceId;
@@ -33,12 +34,13 @@ public class AI
         telemetry.Flush();
     }
 
-    public void SendIngressLog(int ingressLatency, string id, string parentId)
+    public void SendIngressLog(int ingressLatency, string id, string parentId, bool hasError = false)
     {
         var requestTelemetry = new RequestTelemetry
         {
             Id = id,
-            Duration = new TimeSpan(0, 0, 0, 0, ingressLatency)
+            Duration = new TimeSpan(0, 0, 0, 0, ingressLatency),
+            Success = !hasError
         };
         telemetry.Context.Cloud.RoleName = DefaultIoTHubRoleName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
@@ -47,7 +49,7 @@ public class AI
         telemetry.Flush();
     }
 
-    public void SendEgressLog(string endpointName, int egressLatency)
+    public void SendEgressLog(string endpointName, int egressLatency, bool hasError = false)
     {
         var dependencyId = Guid.NewGuid().ToString();
         var requestId = Guid.NewGuid().ToString();
@@ -56,7 +58,8 @@ public class AI
         {
             Id = dependencyId,
             Duration = new TimeSpan(0, 0, 0, 0, egressLatency),
-            Target = endpointName
+            Target = endpointName,
+            Success = !hasError
         };
         telemetry.Context.Cloud.RoleName = DefaultIoTHubRoleName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
@@ -83,6 +86,7 @@ class Record
     public string durationMs;
     public string correlationId;
     public string properties;
+    public string level;
 }
 
 class D2CProperties
@@ -130,6 +134,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
     foreach (Record record in ehm.records)
     {
         log.Info($"Get Record: {record.operationName}");
+        var hasError = record.level == "Error";
         if (record.operationName == "DiagnosticIoTHubD2C")
         {
             var properties = JsonConvert.DeserializeObject<D2CProperties>(record.properties);
@@ -139,18 +144,18 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
             var d2cLatency = (int)(calleeLocalTimeUtc - callerLocalTimeUtc);
 
             var spanId = ParseSpanId(record.correlationId);
-            ai.SendD2CLog(deviceId, d2cLatency, spanId);
+            ai.SendD2CLog(deviceId, d2cLatency, spanId, hasError);
         }
         else if (record.operationName == "DiagnosticIoTHubIngress")
         {
             var properties = JsonConvert.DeserializeObject<IngressProperties>(record.properties);
             var spanId = ParseSpanId(record.correlationId);
-            ai.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId);
+            ai.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, hasError);
         }
         else if (record.operationName == "DiagnosticIoTHubEgress")
         {
             var properties = JsonConvert.DeserializeObject<EgressProperties>(record.properties);
-            ai.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs));
+            ai.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), hasError);
         }
     } 
 }
