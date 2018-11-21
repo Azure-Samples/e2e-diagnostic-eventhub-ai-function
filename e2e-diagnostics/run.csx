@@ -128,7 +128,25 @@ static long DateTimeToMilliseconds(DateTime time)
 public static void Run(EventData myEventHubMessage, TraceWriter log)
 {
     string messageBody = System.Text.Encoding.UTF8.GetString(myEventHubMessage.GetBytes());
-    EventHubMessage ehm = JsonConvert.DeserializeObject<EventHubMessage>(messageBody);
+    EventHubMessage ehm = null;
+    try
+    {
+        ehm = JsonConvert.DeserializeObject<EventHubMessage>(messageBody);
+    }
+    catch (JsonSerializationException e)
+    {
+        log.Error($"Cannot parse Event Hub messages: {e.Message}");
+    }
+    catch (Exception e)
+    {
+        log.Error($"Unknown error when parse Event Hub messages: {e.Message}");
+    }
+
+    if (ehm == null)
+    {
+        return;
+    }
+
     var ai = new AI();
 
     foreach (Record record in ehm.records)
@@ -137,25 +155,82 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
         var hasError = record.level == "Error";
         if (record.operationName == "DiagnosticIoTHubD2C")
         {
-            var properties = JsonConvert.DeserializeObject<D2CProperties>(record.properties);
-            var deviceId = properties.deviceId;
-            var callerLocalTimeUtc = DateTimeToMilliseconds(DateTimeOffset.Parse(properties.callerLocalTimeUtc).UtcDateTime);
-            var calleeLocalTimeUtc = DateTimeToMilliseconds(DateTimeOffset.Parse(properties.calleeLocalTimeUtc).UtcDateTime);
-            var d2cLatency = (int)(calleeLocalTimeUtc - callerLocalTimeUtc);
+            try
+            {
+                var properties = JsonConvert.DeserializeObject<D2CProperties>(record.properties);
+                if (properties != null)
+                {
+                    var deviceId = properties.deviceId;
+                    var callerLocalTimeUtc = DateTimeToMilliseconds(DateTimeOffset.Parse(properties.callerLocalTimeUtc).UtcDateTime);
+                    var calleeLocalTimeUtc = DateTimeToMilliseconds(DateTimeOffset.Parse(properties.calleeLocalTimeUtc).UtcDateTime);
+                    var d2cLatency = (int)(calleeLocalTimeUtc - callerLocalTimeUtc);
 
-            var spanId = ParseSpanId(record.correlationId);
-            ai.SendD2CLog(deviceId, d2cLatency, spanId, hasError);
+                    var spanId = ParseSpanId(record.correlationId);
+                    ai.SendD2CLog(deviceId, d2cLatency, spanId, hasError);
+                }
+                else
+                {
+                    log.Error($"D2C log properties is null: {record.properties}");
+                }
+            }
+            catch (JsonSerializationException e)
+            {
+                log.Error($"Cannot parse D2C log properties: {e.Message}");
+            }
+            catch (Exception e)
+            {
+                log.Error($"Send D2C log to AI failed: {e.Message}");
+            }
         }
         else if (record.operationName == "DiagnosticIoTHubIngress")
         {
-            var properties = JsonConvert.DeserializeObject<IngressProperties>(record.properties);
-            var spanId = ParseSpanId(record.correlationId);
-            ai.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, hasError);
+            try
+            {
+                var properties = JsonConvert.DeserializeObject<IngressProperties>(record.properties);
+                if (properties != null)
+                {
+                    var spanId = ParseSpanId(record.correlationId);
+                    ai.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, hasError);
+
+                }
+                else
+                {
+                    log.Error($"Ingress log properties is null: {record.properties}");
+                }
+            }
+            catch (JsonSerializationException e)
+            {
+                log.Error($"Cannot parse Ingress log properties: {e.Message}");
+            }
+            catch (Exception e)
+            {
+                log.Error($"Send Ingress log to AI failed: {e.Message}");
+            }
         }
         else if (record.operationName == "DiagnosticIoTHubEgress")
         {
-            var properties = JsonConvert.DeserializeObject<EgressProperties>(record.properties);
-            ai.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), hasError);
+            try
+            {
+                var properties = JsonConvert.DeserializeObject<EgressProperties>(record.properties);
+                if (properties != null)
+                {
+                    ai.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), hasError);
+
+                }
+                else
+                {
+                    log.Error($"Egress log properties is null: {record.properties}");
+                }
+
+            }
+            catch (JsonSerializationException e)
+            {
+                log.Error($"Cannot parse Egress log properties: {e.Message}");
+            }
+            catch (Exception e)
+            {
+                log.Error($"Send Egress log to AI failed: {e.Message}");
+            }
         }
-    } 
+    }
 }
