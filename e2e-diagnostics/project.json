@@ -1,0 +1,13 @@
+{
+  "frameworks": {
+    "net46": {
+      "dependencies": {
+        "Microsoft.ApplicationInsights": "2.8.1",
+        "Newtonsoft.Json": "9.0.1",
+        "WindowsAzure.ServiceBus": "5.0.2",
+        "Microsoft.Azure.WebJobs.ServiceBus": "2.2.0",
+        "Microsoft.Azure.WebJobs.Extensions.EventHubs": "3.0.1"
+      }
+    }
+  }
+}
