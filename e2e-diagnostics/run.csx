@@ -1,6 +1,7 @@
 #r "Microsoft.ServiceBus"
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ServiceBus.Messaging;
 using Newtonsoft.Json;
 using System;
@@ -14,8 +15,8 @@ public class AI
 
     public AI()
     {
-        telemetry = new TelemetryClient();
-        telemetry.InstrumentationKey = Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process);
+        TelemetryConfiguration configuration = new TelemetryConfiguration(Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process));
+        telemetry = new TelemetryClient(configuration);
     }
 
     public void SendD2CLog(string deviceId, int d2cLatency, string id, string time, bool hasError = false)
