@@ -14,11 +14,11 @@ public class AI
     static TelemetryConfiguration configuration = new TelemetryConfiguration(Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process));
     static TelemetryClient telemetry = new TelemetryClient(configuration);
 
-    public static void SendD2CLog(string deviceId, int d2cLatency, string id, string time, bool hasError = false)
+    public static void SendD2CLog(string deviceId, int d2cLatency, string id, string time, string correlationId, bool hasError = false)
     {
         var dependencyTelemetry = new DependencyTelemetry
         {
-            Id = id,
+            Id = correlationId,
             Target = DefaultIoTHubRoleName,
             Duration = new TimeSpan(0, 0, 0, 0, d2cLatency),
             Success = !hasError,
@@ -42,11 +42,11 @@ public class AI
         telemetry.Flush();
     }
 
-    public static void SendIngressLog(int ingressLatency, string id, string parentId, string time, bool hasError = false)
+    public static void SendIngressLog(int ingressLatency, string id, string parentId, string time, string correlationId, bool hasError = false)
     {
         var requestTelemetry = new RequestTelemetry
         {
-            Id = id,
+            Id = correlationId,
             Duration = new TimeSpan(0, 0, 0, 0, ingressLatency),
             Success = !hasError,
         };
@@ -69,11 +69,10 @@ public class AI
         telemetry.Flush();
     }
 
-    public static void SendEgressLog(string endpointName, int egressLatency, string time, bool hasError = false)
+    public static void SendEgressLog(string endpointName, int egressLatency, string time, string correlationId, bool hasError = false)
     {
-        var dependencyId = Guid.NewGuid().ToString();
-        var requestId = Guid.NewGuid().ToString();
-
+        var dependencyId = correlationId;
+        var reqeustId = Guid.NewGuid().ToString();
         var dependencyTelemetry = new DependencyTelemetry
         {
             Id = dependencyId,
@@ -99,9 +98,10 @@ public class AI
         telemetry.TrackDependency(dependencyTelemetry);
         telemetry.Flush();
 
+
         var requestTelemetry = new RequestTelemetry
         {
-            Id = requestId
+            Id = reqeustId
         };
 
         requestTelemetry.Timestamp = timestamp;
@@ -200,7 +200,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                     var d2cLatency = (int)(calleeLocalTimeUtc - callerLocalTimeUtc);
 
                     var spanId = ParseSpanId(record.correlationId);
-                    AI.SendD2CLog(deviceId, d2cLatency, spanId, record.time, hasError);
+                    AI.SendD2CLog(deviceId, d2cLatency, spanId, record.time, record.correlationId, hasError);
                 }
                 else
                 {
@@ -224,7 +224,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                 if (properties != null)
                 {
                     var spanId = ParseSpanId(record.correlationId);
-                    AI.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, record.time, hasError);
+                    AI.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, record.time, record.correlationId, hasError);
                 }
                 else
                 {
@@ -247,7 +247,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                 var properties = JsonConvert.DeserializeObject<EgressProperties>(record.properties);
                 if (properties != null)
                 {
-                    AI.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), record.time, hasError);
+                    AI.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), record.time, record.correlationId, hasError);
                 }
                 else
                 {
