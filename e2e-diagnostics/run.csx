@@ -14,7 +14,7 @@ public class AI
     static TelemetryConfiguration configuration = new TelemetryConfiguration(Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process));
     static TelemetryClient telemetry = new TelemetryClient(configuration);
 
-    public static void SendD2CLog(string deviceId, int d2cLatency, string id, string time, string correlationId, bool hasError = false)
+    public static void SendD2CLog(string deviceId, int d2cLatency, string time, string correlationId, bool hasError = false)
     {
         var dependencyTelemetry = new DependencyTelemetry
         {
@@ -42,7 +42,7 @@ public class AI
         telemetry.Flush();
     }
 
-    public static void SendIngressLog(int ingressLatency, string id, string parentId, string time, string correlationId, bool hasError = false)
+    public static void SendIngressLog(int ingressLatency, string parentId, string time, string correlationId, bool hasError = false)
     {
         var requestTelemetry = new RequestTelemetry
         {
@@ -151,9 +151,11 @@ class EventHubMessage
     public Record[] records;
 }
 
-static string ParseSpanId(string correlationId)
+static string ParseParentId(string correlationId, string parentSpanId)
 {
-    return correlationId.Split('-')[2];
+    var ids = correlationId.Split('-');
+    ids[2] = parentSpanId;
+    return string.Join("-", ids);
 }
 
 static long DateTimeToMilliseconds(DateTime time)
@@ -199,8 +201,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                     var calleeLocalTimeUtc = DateTimeToMilliseconds(DateTimeOffset.Parse(properties.calleeLocalTimeUtc).UtcDateTime);
                     var d2cLatency = (int)(calleeLocalTimeUtc - callerLocalTimeUtc);
 
-                    var spanId = ParseSpanId(record.correlationId);
-                    AI.SendD2CLog(deviceId, d2cLatency, spanId, record.time, record.correlationId, hasError);
+                    AI.SendD2CLog(deviceId, d2cLatency, record.time, record.correlationId, hasError);
                 }
                 else
                 {
@@ -223,8 +224,8 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                 var properties = JsonConvert.DeserializeObject<IngressProperties>(record.properties);
                 if (properties != null)
                 {
-                    var spanId = ParseSpanId(record.correlationId);
-                    AI.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, record.time, record.correlationId, hasError);
+                    var parentId = ParseParentId(record.correlationId, properties.parentSpanId);
+                    AI.SendIngressLog(Convert.ToInt32(record.durationMs), parentId, record.time, record.correlationId, hasError);
                 }
                 else
                 {
@@ -253,7 +254,6 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                 {
                     log.Error($"Egress log properties is null: {record.properties}");
                 }
-
             }
             catch (JsonSerializationException e)
             {
