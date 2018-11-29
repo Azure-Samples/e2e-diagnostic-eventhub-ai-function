@@ -1,47 +1,67 @@
 #r "Microsoft.ServiceBus"
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.DataContracts;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ServiceBus.Messaging;
 using Newtonsoft.Json;
 using System;
 
 public class AI
 {
-    TelemetryClient telemetry = new TelemetryClient();
     const string DefaultRoleInstance = "default";
     const string DefaultIoTHubRoleName = "IoT Hub";
     const string DefaultDeviceRoleName = "Devices";
+    static TelemetryConfiguration configuration = new TelemetryConfiguration(Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process));
+    static TelemetryClient telemetry = new TelemetryClient(configuration);
 
-    public AI()
+    public static void SendD2CLog(string deviceId, int d2cLatency, string time, string correlationId, bool hasError = false)
     {
-        telemetry = new TelemetryClient();
-        telemetry.InstrumentationKey = Environment.GetEnvironmentVariable("E2E_DIAGNOSTICS_AI_INSTRUMENTATION_KEY", EnvironmentVariableTarget.Process);
-    }
-
-    public void SendD2CLog(string deviceId, int d2cLatency, string id, bool hasError = false)
-    {
-        var dependencyTelemety = new DependencyTelemetry
+        var dependencyTelemetry = new DependencyTelemetry
         {
-            Id = id,
+            Id = correlationId,
             Target = DefaultIoTHubRoleName,
             Duration = new TimeSpan(0, 0, 0, 0, d2cLatency),
-            Success = !hasError
+            Success = !hasError,
         };
+
+        if (!DateTimeOffset.TryParse(time, out var timestamp))
+        {
+            timestamp = DateTimeOffset.Now;
+            dependencyTelemetry.Timestamp = timestamp;
+            dependencyTelemetry.Properties["originalTimestamp"] = time;
+        }
+        else
+        {
+            dependencyTelemetry.Timestamp = timestamp;
+        }
+
         telemetry.Context.Cloud.RoleName = DefaultDeviceRoleName;
         telemetry.Context.Cloud.RoleInstance = deviceId;
 
-        telemetry.TrackDependency(dependencyTelemety);
+        telemetry.TrackDependency(dependencyTelemetry);
         telemetry.Flush();
     }
 
-    public void SendIngressLog(int ingressLatency, string id, string parentId, bool hasError = false)
+    public static void SendIngressLog(int ingressLatency, string parentId, string time, string correlationId, bool hasError = false)
     {
         var requestTelemetry = new RequestTelemetry
         {
-            Id = id,
+            Id = correlationId,
             Duration = new TimeSpan(0, 0, 0, 0, ingressLatency),
-            Success = !hasError
+            Success = !hasError,
         };
+
+        if (!DateTimeOffset.TryParse(time, out var timestamp))
+        {
+            timestamp = DateTimeOffset.Now;
+            requestTelemetry.Timestamp = timestamp;
+            requestTelemetry.Properties["originalTimestamp"] = time;
+        }
+        else
+        {
+            requestTelemetry.Timestamp = timestamp;
+        }
+
         telemetry.Context.Cloud.RoleName = DefaultIoTHubRoleName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
         telemetry.Context.Operation.ParentId = parentId;
@@ -49,27 +69,43 @@ public class AI
         telemetry.Flush();
     }
 
-    public void SendEgressLog(string endpointName, int egressLatency, bool hasError = false)
+    public static void SendEgressLog(string endpointName, int egressLatency, string time, string correlationId, bool hasError = false)
     {
-        var dependencyId = Guid.NewGuid().ToString();
-        var requestId = Guid.NewGuid().ToString();
-
-        var dependencyTelemety = new DependencyTelemetry
+        var dependencyId = correlationId;
+        var reqeustId = Guid.NewGuid().ToString();
+        var dependencyTelemetry = new DependencyTelemetry
         {
             Id = dependencyId,
             Duration = new TimeSpan(0, 0, 0, 0, egressLatency),
             Target = endpointName,
-            Success = !hasError
+            Success = !hasError,
         };
+
+        DateTimeOffset timestamp;
+        if (!DateTimeOffset.TryParse(time, out timestamp))
+        {
+            timestamp = DateTimeOffset.Now;
+            dependencyTelemetry.Timestamp = timestamp;
+            dependencyTelemetry.Properties["originalTimestamp"] = time;
+        }
+        else
+        {
+            dependencyTelemetry.Timestamp = timestamp;
+        }
+
         telemetry.Context.Cloud.RoleName = DefaultIoTHubRoleName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
-        telemetry.TrackDependency(dependencyTelemety);
+        telemetry.TrackDependency(dependencyTelemetry);
         telemetry.Flush();
+
 
         var requestTelemetry = new RequestTelemetry
         {
-            Id = requestId
+            Id = reqeustId
         };
+
+        requestTelemetry.Timestamp = timestamp;
+
         telemetry.Context.Cloud.RoleName = endpointName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
         telemetry.Context.Operation.ParentId = dependencyId;
@@ -115,9 +151,11 @@ class EventHubMessage
     public Record[] records;
 }
 
-static string ParseSpanId(string correlationId)
+static string ParseParentId(string correlationId, string parentSpanId)
 {
-    return correlationId.Split('-')[2];
+    var ids = correlationId.Split('-');
+    ids[2] = parentSpanId;
+    return string.Join("-", ids);
 }
 
 static long DateTimeToMilliseconds(DateTime time)
@@ -147,8 +185,6 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
         return;
     }
 
-    var ai = new AI();
-
     foreach (Record record in ehm.records)
     {
         log.Info($"Get Record: {record.operationName}");
@@ -165,8 +201,7 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                     var calleeLocalTimeUtc = DateTimeToMilliseconds(DateTimeOffset.Parse(properties.calleeLocalTimeUtc).UtcDateTime);
                     var d2cLatency = (int)(calleeLocalTimeUtc - callerLocalTimeUtc);
 
-                    var spanId = ParseSpanId(record.correlationId);
-                    ai.SendD2CLog(deviceId, d2cLatency, spanId, hasError);
+                    AI.SendD2CLog(deviceId, d2cLatency, record.time, record.correlationId, hasError);
                 }
                 else
                 {
@@ -189,9 +224,8 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                 var properties = JsonConvert.DeserializeObject<IngressProperties>(record.properties);
                 if (properties != null)
                 {
-                    var spanId = ParseSpanId(record.correlationId);
-                    ai.SendIngressLog(Convert.ToInt32(record.durationMs), spanId, properties.parentSpanId, hasError);
-
+                    var parentId = ParseParentId(record.correlationId, properties.parentSpanId);
+                    AI.SendIngressLog(Convert.ToInt32(record.durationMs), parentId, record.time, record.correlationId, hasError);
                 }
                 else
                 {
@@ -214,14 +248,12 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
                 var properties = JsonConvert.DeserializeObject<EgressProperties>(record.properties);
                 if (properties != null)
                 {
-                    ai.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), hasError);
-
+                    AI.SendEgressLog(properties.endpointName, Convert.ToInt32(record.durationMs), record.time, record.correlationId, hasError);
                 }
                 else
                 {
                     log.Error($"Egress log properties is null: {record.properties}");
                 }
-
             }
             catch (JsonSerializationException e)
             {
