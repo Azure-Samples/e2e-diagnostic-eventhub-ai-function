@@ -410,6 +410,11 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
     log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
     if(myEventHubMessage.Properties.Keys.Contains("$.tracestate"))
     {
+        log.Info($"Receive message with diagnostic header.");
         SendRandomLogs();
+    }
+    else
+    {
+        log.Info($"Receive message without diagnostic header.");
     }
 }
