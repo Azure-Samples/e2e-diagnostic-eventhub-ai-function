@@ -37,6 +37,7 @@ public class AI
 
         telemetry.Context.Cloud.RoleName = DefaultDeviceRoleName;
         telemetry.Context.Cloud.RoleInstance = deviceId;
+        telemetry.Context.Operation.Id = correlationId;
 
         telemetry.TrackDependency(dependencyTelemetry);
         telemetry.Flush();
@@ -65,6 +66,8 @@ public class AI
         telemetry.Context.Cloud.RoleName = DefaultIoTHubRoleName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
         telemetry.Context.Operation.ParentId = parentId;
+        telemetry.Context.Operation.Id = correlationId;
+
         telemetry.TrackRequest(requestTelemetry);
         telemetry.Flush();
     }
@@ -95,6 +98,8 @@ public class AI
 
         telemetry.Context.Cloud.RoleName = DefaultIoTHubRoleName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
+        telemetry.Context.Operation.Id = correlationId;
+
         telemetry.TrackDependency(dependencyTelemetry);
         telemetry.Flush();
 
@@ -109,6 +114,8 @@ public class AI
         telemetry.Context.Cloud.RoleName = endpointName;
         telemetry.Context.Cloud.RoleInstance = DefaultRoleInstance;
         telemetry.Context.Operation.ParentId = dependencyId;
+        //This telemtry is used to draw the application Map, so we do not save its correlation id
+
         telemetry.TrackRequest(requestTelemetry);
         telemetry.Flush();
     }
