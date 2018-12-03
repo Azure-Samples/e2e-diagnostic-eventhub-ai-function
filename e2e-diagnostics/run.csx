@@ -298,7 +298,7 @@ static string GenerateTraceId(string prefix, string spanId = null)
     return $"00-{prefix}-{spanId}-01";
 }
 
-static void SendRandomLogs()
+static void SendRandomLogs(string deviceId)
 {
     var prefixBytes = new byte[16];
     random.NextBytes(prefixBytes);
@@ -314,7 +314,6 @@ static void SendRandomLogs()
     var ingressCorrelationId = GenerateTraceId(prefix, ingressSpanId);
 
     //d2c log
-    var randDeviceName = deviceNames[random.Next(deviceNames.Length)];
     var randD2CLatency = random.Next(1, 1000);
     var D2CLogTimeStamp = (DateTime.Now - TimeSpan.FromMilliseconds(random.Next(1000))).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'");
 
@@ -322,11 +321,11 @@ static void SendRandomLogs()
     {
         callerLocalTimeUtc = (DateTime.Now).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'"),
         calleeLocalTimeUtc = (DateTime.Now + TimeSpan.FromMilliseconds(random.Next(1000))).ToUniversalTime().ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'"),
-        deviceId = randDeviceName,
+        deviceId = deviceId,
         messageSize = random.Next(1000).ToString()
     };
 
-    AI.SendD2CLog(randDeviceName, randD2CLatency, D2CLogTimeStamp, d2CCorrelationId, randD2CProperties, random.Next(1000) == 100);
+    AI.SendD2CLog(deviceId, randD2CLatency, D2CLogTimeStamp, d2CCorrelationId, randD2CProperties, random.Next(1000) == 100);
 
     //ingress log
     var randIngressLatency = random.Next(1, 1000);
@@ -411,7 +410,8 @@ public static void Run(EventData myEventHubMessage, TraceWriter log)
     if(myEventHubMessage.Properties.Keys.Contains("$.tracestate"))
     {
         log.Info($"Receive message with diagnostic header.");
-        SendRandomLogs();
+        var deviceId = myEventHubMessage.SystemProperties["iothub-connection-device-id"].ToString();
+        SendRandomLogs(deviceId);
     }
     else
     {
