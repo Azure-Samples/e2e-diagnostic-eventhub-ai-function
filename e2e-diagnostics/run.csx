@@ -407,27 +407,8 @@ static void SendRandomLogs()
 
 public static void Run(EventData myEventHubMessage, TraceWriter log)
 {
-    string messageBody = System.Text.Encoding.UTF8.GetString(myEventHubMessage.GetBytes());
-    EventHubMessage ehm = null;
-    try
-    {
-        ehm = JsonConvert.DeserializeObject<EventHubMessage>(messageBody);
-    }
-    catch (JsonSerializationException e)
-    {
-        log.Error($"Cannot parse Event Hub messages: {e.Message}");
-    }
-    catch (Exception e)
-    {
-        log.Error($"Unknown error when parse Event Hub messages: {e.Message}");
-    }
-
-    if (ehm == null)
-    {
-        return;
-    }
-
-    foreach (Record record in ehm.records)
+    log.Info($"C# Event Hub trigger function processed a message: {myEventHubMessage}");
+    if(myEventHubMessage.Properties.Keys.Contains("$.tracestate"))
     {
         SendRandomLogs();
     }
