@@ -22,7 +22,7 @@ public class AI
             Target = DefaultIoTHubRoleName,
             Duration = new TimeSpan(0, 0, 0, 0, d2cLatency),
             Success = !hasError,
-            Name = "D2C Latency"
+            Name = "D2C Latency: " + deviceId
         };
 
         dependencyTelemetry.Properties["calleeLocalTimeUtc"] = properties.calleeLocalTimeUtc;
