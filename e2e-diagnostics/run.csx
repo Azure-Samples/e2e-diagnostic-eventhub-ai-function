@@ -136,7 +136,7 @@ public class AI
     }
 }
 
-class Record
+public class Record
 {
     public string time;
     public string resourceId;
@@ -147,7 +147,7 @@ class Record
     public string level;
 }
 
-class D2CProperties
+public class D2CProperties
 {
     public string messageSize;
     public string deviceId;
@@ -155,32 +155,32 @@ class D2CProperties
     public string calleeLocalTimeUtc;
 }
 
-class IngressProperties
+public class IngressProperties
 {
     public string isRoutingEnabled;
     public string parentSpanId;
 }
 
-class EgressProperties
+public class EgressProperties
 {
     public string endpointType;
     public string endpointName;
     public string parentSpanId;
 }
 
-class EventHubMessage
+public class EventHubMessage
 {
     public Record[] records;
 }
 
-static string ParseParentId(string correlationId, string parentSpanId)
+public static string ParseParentId(string correlationId, string parentSpanId)
 {
     var ids = correlationId.Split('-');
     ids[2] = parentSpanId;
     return string.Join("-", ids);
 }
 
-static long DateTimeToMilliseconds(DateTime time)
+public static long DateTimeToMilliseconds(DateTime time)
 {
     return (long)(time - new DateTime(1970, 1, 1)).TotalMilliseconds;
 }
